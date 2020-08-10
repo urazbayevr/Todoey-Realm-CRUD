@@ -7,20 +7,36 @@
 //
 
 import UIKit
-import CoreData
+import RealmSwift
+import SwipeCellKit
 
-class CategoryViewController: UITableViewController {
-    var categories = [Category]()
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+class CategoryViewController: SwipeTableViewController{
+    let realm = try! Realm()
+    
+    var categories: Results<Category>?
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        tableView.rowHeight = 80.0
         loadCategory()
     }
+//MARK: - tableview Datasource methods
+    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        return categories?.count ?? 1
+    }
+    
+    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "CategoryCell", for: indexPath) as! SwipeTableViewCell
+        cell.textLabel?.text = categories?[indexPath.row].name ?? "Don`t have added Categories"
+        cell.delegate = self
+        return cell
+    }
 //MARK: - Save the Data to context
-    func saveTheData() {
+    func saveTheData(category: Category) {
         do{
-            try context.save()
+            try realm.write{
+                realm.add(category)
+            }
         }catch{
             print("!!!!!!!!Error at encoding, \(error)")
         }
@@ -29,12 +45,7 @@ class CategoryViewController: UITableViewController {
     }
 //MARK: - load the data from datamodel cRud
     func loadCategory() {
-        let request: NSFetchRequest<Category> = Category.fetchRequest()
-        do{
-            categories = try context.fetch(request)
-        } catch {
-            print("!!!!!!!Error when fetching the data from context \(error)")
-        }
+        categories = realm.objects(Category.self)
         tableView.reloadData()
     }
 //MARK: - Add new categories
@@ -42,10 +53,9 @@ class CategoryViewController: UITableViewController {
         var textField = UITextField()
         let alert = UIAlertController(title: "Add new Category", message: "", preferredStyle: .alert)
         let action = UIAlertAction(title: "Add", style: .default) { (alert) in
-            let newCategory = Category(context: self.context)
+            let newCategory = Category()
             newCategory.name = textField.text!
-            self.categories.append(newCategory)
-            self.saveTheData()
+            self.saveTheData(category: newCategory)
         }
         alert.addAction(action) //making action
         alert.addTextField { (addTextField) in
@@ -54,29 +64,20 @@ class CategoryViewController: UITableViewController {
         }
         present(alert, animated: true, completion: nil)
     }
-//MARK: - tableview Datasource methods
-    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return categories.count
-    }
-    
-    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "CategoryCell", for: indexPath)
-        cell.textLabel?.text = categories[indexPath.row].name
-        return cell
-    }
 //MARK: - TableView Delegate methods
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-//        performSegue(withIdentifier: "goToItems", sender: self)
+        //        performSegue(withIdentifier: "goToItems", sender: self)
         let vc = self.storyboard?.instantiateViewController(withIdentifier: "items_storyboard") as! ToDoViewController
-        vc.selectedCategory = categories[indexPath.row]
+        vc.selectedCategory = categories?[indexPath.row]
         self.navigationController?.pushViewController(vc, animated: true)
     }
     
-//    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-//        let destinationVC = segue.destination as! ToDoViewController
-//
-//        if let indexPath = tableView.indexPathForSelectedRow{
-//            destinationVC.selectedCategory = categories[indexPath.row]  //perform the selected row to TodoVC
-//        }
-//    }
+    //    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+    //        let destinationVC = segue.destination as! ToDoViewController
+    //
+    //        if let indexPath = tableView.indexPathForSelectedRow{
+    //            destinationVC.selectedCategory = categories[indexPath.row]  //perform the selected row to TodoVC
+    //        }
+    //    }
 }
+
