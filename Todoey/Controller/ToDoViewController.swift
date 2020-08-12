@@ -8,8 +8,9 @@
 
 import UIKit
 import RealmSwift
+import ChameleonFramework
 
-class ToDoViewController: UITableViewController {
+class ToDoViewController: SwipeTableViewController {
     let realm = try! Realm()
     var itemObject: Results<Item>?
     
@@ -18,11 +19,26 @@ class ToDoViewController: UITableViewController {
             loadItems()
         }
     }
+    @IBOutlet weak var searchBar: UISearchBar!
     
     //MARK: - viewDidLoad
     override func viewDidLoad() {
         super.viewDidLoad()
         print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
+    }
+    //MARK: - viewWillAppear
+    override func viewWillAppear(_ animated: Bool) {
+        if let colourHex = selectedCategory?.color{
+            title = selectedCategory!.name //nav bar title
+            guard let navBar = navigationController?.navigationBar else {fatalError("Navigation Controller does not exist")}
+            if let navBarColour = UIColor(hexString: colourHex){
+                navBar.backgroundColor = navBarColour //nav bar color
+                navBar.tintColor = ContrastColorOf(navBarColour, returnFlat: true)
+                navBar.largeTitleTextAttributes = [NSAttributedString.Key.foregroundColor: ContrastColorOf(navBarColour, returnFlat: true)]
+                searchBar.barTintColor = navBarColour
+                searchBar.searchTextField.backgroundColor = .white
+            }
+        }
     }
     //MARK: - cell initializing
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -30,9 +46,16 @@ class ToDoViewController: UITableViewController {
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoViewCell", for: indexPath)
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
         if let item = itemObject?[indexPath.row]{
             cell.textLabel?.text = item.title
+            let categoryColor = UIColor(hexString: selectedCategory!.color)
+            if let colour = categoryColor?.darken(byPercentage: CGFloat(indexPath.row) / CGFloat(itemObject!.count)){
+                cell.backgroundColor = colour
+                cell.textLabel?.textColor = ContrastColorOf(colour, returnFlat: true)
+            }
+            
+            
             cell.accessoryType = item.done ? .checkmark : .none
         } else{
             cell.textLabel?.text = "No Items have been added yet"
@@ -55,7 +78,18 @@ class ToDoViewController: UITableViewController {
         }
         tableView.reloadData()
     }
-    
+//MARK: - Delete data from swipe
+    override func updateModel(at indexpath: IndexPath) {
+        if let item = self.itemObject?[indexpath.row]{
+            do{
+                try self.realm.write{ ///updates the database
+                    self.realm.delete(item)
+                }
+            } catch {
+                print("Error catched on Updating data\(error)")
+            }
+        }
+    }
     //MARK: - Bar button item
     
     @IBAction func barButtonPressed(_ sender: Any) {
